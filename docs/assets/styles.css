@@ -1,0 +1,10 @@
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(to right, cyan, magenta);
+}
+/* Override VitePress home margin (theme CSS may load after this file) */
+@media (min-width: 768px) {
+  .VPHome {
+    margin-bottom: 0 !important;
+  }
+}

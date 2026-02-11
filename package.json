@@ -1,0 +1,51 @@
+{
+  "name": "neon-board",
+  "version": "0.1.0",
+  "description": "Lightweight multiplayer game framework with Firebase Firestore. Build board games, card games, and live multiplayer experiences with Firebase — no game server required.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "peerDependencies": {
+    "firebase": ">=11.0.0",
+    "react": ">=17.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "firebase": "^11.0.0",
+    "react": "^18.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.0.0",
+    "vitepress": "^1.6.0"
+  },
+  "keywords": [
+    "multiplayer",
+    "game",
+    "firebase",
+    "firestore",
+    "boardgame",
+    "real-time",
+    "react",
+    "hooks"
+  ],
+  "author": "",
+  "license": "MIT",
+  "homepage": "https://neon-board.atomic10.studio",
+  "github": "https://github.com/jameson13b/neon-board"
+}

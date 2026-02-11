@@ -1,0 +1,60 @@
+/**
+ * Neon Board — multiplayer game framework with Firebase Firestore
+ * Board + clients or clients-only; hooks-first API.
+ */
+
+export { NeonBoardProvider, useNeonBoardContext } from './context.js';
+export type { NeonBoardContextValue, NeonBoardProviderProps } from './context.js';
+
+export {
+  useCreateGame,
+  useJoinGame,
+  useGameState,
+  useSubmitAction,
+  useBoardActions,
+  useEndTurn,
+  useEndPhase,
+  useSetPhase,
+  useSetTurnOrder,
+  useSetStatus,
+  useStoredSession,
+  useLeaveGame,
+} from './hooks.js';
+
+export {
+  createGame,
+  joinGame,
+  getStoredSession,
+  leaveGame,
+  subscribeToGame,
+  subscribeToPendingActions,
+  addPendingAction,
+  updateGameState,
+  processPendingActions,
+  endTurn,
+  endPhase,
+  setPhase,
+  setTurnOrder,
+  setStatus,
+} from './api.js';
+export { getOrCreateBoardId } from './reconnect.js';
+export type { GetOrCreateBoardIdOptions } from './reconnect.js';
+
+export type {
+  Role,
+  GameStatus,
+  GameDoc,
+  GameContext,
+  PendingActionDoc,
+  ActionReducer,
+  ActionContext,
+  ActionMap,
+  CreateGameOptions,
+  JoinGameOptions,
+  CreateGameResult,
+  JoinGameResult,
+  StoredSession,
+  GameStateSnapshot,
+} from './types.js';
+export type { GameDocTurnPhase } from './state.js';
+export { getNextTurnUpdates, getNextPhaseUpdates } from './state.js';

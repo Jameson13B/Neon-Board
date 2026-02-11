@@ -1,6 +1,6 @@
 <img src="./docs/public/logo.png" alt="Neon Board" width="200" style="display: block; margin: 4rem auto 3rem;">
 
-# [Neon Board](https://neon-board.atomic10.studio)
+# [Neon Board](https://neonboard.atomic10.studio)
 
 Lightweight multiplayer game framework with **Firebase Firestore**. Build board games, card games, and live multiplayer experiences with Firebase — no game server required.
 
@@ -13,8 +13,8 @@ Lightweight multiplayer game framework with **Firebase Firestore**. Build board 
 
 ## Website/Documentation
 
-https://neon-board.atomic10.studio
+https://neonboard.atomic10.studio
 
 ## GitHub
 
-https://github.com/jameson13b/neon-board
+https://github.com/Jameson13B/Neon-Board

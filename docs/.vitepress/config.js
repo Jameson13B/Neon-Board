@@ -6,7 +6,7 @@ export default {
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/start-here" },
-      { text: "API", link: "/api" },
+      { text: "API", link: "/api/" },
       { text: "GitHub", link: "https://github.com/jameson13b/neon-board" },
     ],
     search: {
@@ -27,7 +27,7 @@ export default {
       {
         text: "API Reference",
         items: [
-          { text: "Overview", link: "/api" },
+          { text: "Overview", link: "/api/" },
           { text: "Hooks", link: "/api/hooks" },
           { text: "Imperative API", link: "/api/imperative" },
           { text: "Types", link: "/api/types" },

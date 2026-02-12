@@ -132,4 +132,4 @@ const endPhase = useEndPhase(gameId, role, snapshot, gameConfig);
 
 - [Concepts](/guide/concepts) — Turn-based vs phase-based, terminology.
 - [Firestore & rules](/guide/firestore) — Collections and security rules.
-- [API Reference](/api) — Hooks, imperative API, **GameConfig** types.
+- [API Reference](/api/) — Hooks, imperative API, **GameConfig** types.

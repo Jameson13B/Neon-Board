@@ -27,7 +27,7 @@ Neon Board is a multiplayer game framework that keeps one shared game in sync ac
 | **Understand turn-based vs phase-based** | [Concepts](/guide/concepts) |
 | **Set up Firestore and rules** | [Firestore & rules](/guide/firestore) |
 | **Handle reconnection** | [Reconnection](/guide/reconnection) |
-| **Look up APIs and types** | [API Reference](/api) |
+| **Look up APIs and types** | [API Reference](/api/) |
 
 ---
 

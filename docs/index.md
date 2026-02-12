@@ -39,7 +39,7 @@ features:
 - **[Concepts](/guide/concepts)** — Turn-based vs phase-based, terminology (optional).
 - **[Firestore & rules](/guide/firestore)** — Collections and security rules.
 - **[Reconnection](/guide/reconnection)** — Stored session and rejoin flow.
-- **[API Reference](/api)** — Hooks, imperative API, types (GameConfig, PhaseConfig, etc.).
+- **[API Reference](/api/)** — Hooks, imperative API, types (GameConfig, PhaseConfig, etc.).
 
 ## Install
 

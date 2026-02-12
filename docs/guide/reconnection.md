@@ -1,6 +1,6 @@
 ---
 prev: { text: 'Firestore & rules', link: '/guide/firestore' }
-next: { text: 'API Reference', link: '/api' }
+next: { text: 'API Reference', link: '/api/' }
 ---
 
 # Reconnection

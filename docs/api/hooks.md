@@ -1,6 +1,11 @@
+---
+prev: { text: 'Overview', link: '/api' }
+next: { text: 'Imperative API', link: '/api/imperative' }
+---
+
 # Hooks
 
-All hooks must be used inside **NeonBoardProvider**. The provider supplies `db` (Firestore), `getCurrentUserId`, and optionally `getBoardId` to the tree.
+All hooks must be used inside **NeonBoardProvider**. The provider supplies `db` (Firestore), `getCurrentUserId`, and optionally `getBoardId` to the tree. Your game is defined by a **GameConfig**; you pass it to **useCreateGame**’s `createGame(options)` (as `options.gameConfig`) and to **useBoardActions**, and **useEndTurn** / **useEndPhase** so the board applies actions and runs lifecycle hooks. See [Game config](/guide/game-config).
 
 ---
 
@@ -30,12 +35,8 @@ Create a new game; the caller becomes the board.
 **Returns:** `createGame`, `gameId`, `joinCode`, `error`, `loading`
 
 - **createGame(options?)** — `options`: **CreateGameOptions**
-  - `joinCode?: string` — Custom join code (otherwise generated).
-  - `initialState?: Record<string, unknown>` — Initial game state.
-  - `initialPhase?: string` — First phase (default from `phases[0]` if `phases` set).
-  - `phases?: string[]` — Ordered phases for phase-based games (e.g. `['lobby', 'play', 'ended']`).
-  - `turnOrder?: string[]` — Turn order (player IDs). If omitted, join order is used.
-  - `meta?: Record<string, unknown>` — Custom metadata.
+  - `gameConfig?: GameConfig` — If set, phases and initial phase are derived (phase with **start: true**, then **next** chain). If **setup** is defined, it runs and its return value is the initial state.
+  - `joinCode?`, `initialState?`, `initialPhase?`, `phases?`, `turnOrder?`, `meta?` — See [Types](/api/types). **initialState** is ignored when **gameConfig.setup** is provided.
   - Returns `Promise<CreateGameResult | null>`.
 
 ---
@@ -70,23 +71,23 @@ For players: enqueue an action for the board to apply.
 
 ---
 
-## useBoardActions(gameId, role, snapshot, actionMap)
+## useBoardActions(gameId, role, snapshot, gameConfig)
 
-**Board only.** Subscribes to pending actions and applies them with your **actionMap**. Call once in the board UI. Memoize **actionMap** (e.g. `useMemo`) so the effect doesn’t re-run every render.
+**Board only.** Subscribes to pending actions and applies them with your **gameConfig**. The engine validates that each action type is allowed in the current phase (global moves + phase moves). Call once in the board UI. Memoize **gameConfig** (e.g. `useMemo`) so the effect doesn’t re-run every render.
 
-**actionMap:** `Record<string, ActionReducer>` — each key is an action type; each value is `(state, payload, context) => newState`. **context** is **ActionContext** (engine state + `playerId` who sent the action).
-
----
-
-## useEndTurn(gameId, role, snapshot)
-
-**Board only.** Returns a function that advances to the next player and increments turn (and round when wrapping). Call it when the current player’s turn is over. Pass the current **snapshot** from **useGameState**.
+**gameConfig:** **GameConfig** — **moves** (global), **phases** (each with **moves** object and optional **start**, **next**, **onBegin**, **onEnd**). Engine allows an action in phase P if it's in **config.moves** or **config.phases[P].moves** (action type → `(state, payload, context) => newState`). **context** is **ActionContext** (engine state + `playerId` who sent the action).
 
 ---
 
-## useEndPhase(gameId, role, snapshot)
+## useEndTurn(gameId, role, snapshot, gameConfig?)
 
-**Board only.** Returns a function that advances to the next phase. Call with no args to use the configured phases list, or **endPhase(nextPhase)** to jump to a specific phase. Pass the current **snapshot**.
+**Board only.** Returns a function that advances to the next player and increments turn (and round when wrapping). Call it when the current player’s turn is over. Pass the full **snapshot** (state + context). If you pass **gameConfig**, **turns.onEnd** and **turns.onBegin** run.
+
+---
+
+## useEndPhase(gameId, role, snapshot, gameConfig?)
+
+**Board only.** Returns a function that advances to the next phase. Call with no args to use the phase list (from config's **next** chain), or **endPhase(nextPhase)** to jump. Pass the full **snapshot**. If you pass **gameConfig**, the current phase's **onEnd** and the next phase's **onBegin** run.
 
 ---
 

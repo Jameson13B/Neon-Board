@@ -1,0 +1,24 @@
+/* Add to .vitepress/theme/custom.css */
+:root {
+  --vp-banner-bg: #f59e0b; /* Warning color */
+  --vp-banner-text: var(--vp-c-text-1);
+}
+html.dark .beta-banner {
+  --vp-banner-text: var(--vp-c-bg);
+}
+
+.beta-banner {
+  background-color: var(--vp-banner-bg);
+  color: var(--vp-banner-text);
+  text-align: center;
+  padding: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.VPNav {
+  margin-top: 32px;
+}

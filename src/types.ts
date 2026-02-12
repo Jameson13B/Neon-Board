@@ -61,24 +61,69 @@ export type ActionContext = GameContext & {
   playerId: string;
 };
 
-/** Action definition: (state, payload) => newState. Run only on board. */
+/** Action definition: (state, payload, context) => newState. Run only on board. */
 export type ActionReducer<State = Record<string, unknown>> = (
   state: State,
   payload: Record<string, unknown>,
   context: ActionContext
 ) => State;
 
-/** Map of action type -> reducer. */
-export type ActionMap<State = Record<string, unknown>> = Record<string, ActionReducer<State>>;
+/** Minimal context when running setup (no playerId). */
+export interface SetupContext {
+  phase: string;
+  turn: number;
+  round: number;
+  status: GameStatus;
+  turnOrder: string[];
+  currentPlayerIndex: number;
+}
 
-/** Config when creating a game. */
+/** Turn lifecycle hooks (optional). Run when the board calls endTurn(). */
+export interface TurnConfig<State = Record<string, unknown>> {
+  onBegin?: ActionReducer<State>;
+  onEnd?: ActionReducer<State>;
+}
+
+/** Per-phase config: moves colocated; optional lifecycle and next phase. */
+export interface PhaseConfig<State = Record<string, unknown>> {
+  /** Mark this phase as the initial phase (exactly one phase should have start: true). */
+  start?: boolean;
+  /** Run when entering this phase (after endPhase advances). */
+  onBegin?: ActionReducer<State>;
+  /** Run when leaving this phase (before endPhase advances). */
+  onEnd?: ActionReducer<State>;
+  /** Moves allowed only in this phase. Keys = action types, values = reducers. */
+  moves?: Record<string, ActionReducer<State>>;
+  /** Next phase name (for phase flow). Used to derive phase order. */
+  next?: string;
+}
+
+/**
+ * Game config: single source of truth. Top-level moves = global (any phase).
+ * Phases define phase-specific moves and optional onBegin/onEnd; each phase can set next.
+ */
+export interface GameConfig<State = Record<string, unknown>> {
+  /** Run once when the game is created. Return initial state. */
+  setup?: (context: SetupContext) => State;
+  /** Global moves (allowed in any phase). Keys = action types, values = reducers. */
+  moves?: Record<string, ActionReducer<State>>;
+  /** Turn lifecycle hooks. Run when the board calls endTurn(). */
+  turns?: TurnConfig<State>;
+  /** Phase definitions. Key = phase name. Use start: true for initial phase; use next for flow. */
+  phases: Record<string, PhaseConfig<State>>;
+}
+
+/** Config when creating a game. Pass gameConfig to derive phases, initial phase, and optional setup(). */
 export interface CreateGameOptions {
+  /** Game config. If set, phases and initial phase are derived (phase with start: true, then next chain). setup() runs to produce initial state if provided. */
+  gameConfig?: GameConfig;
   joinCode?: string;
+  /** Initial state. Ignored if gameConfig.setup is provided. */
   initialState?: Record<string, unknown>;
   initialPhase?: string;
-  /** Phase list for ordered advancement via endPhase(). First element is used if initialPhase not set. */
+  /** Phase list for ordered advancement. Ignored if gameConfig is set. */
   phases?: string[];
-  /** Turn order (player IDs). If omitted, join order is used as turn order once players join. */
+  /** Turn order (player IDs). If omitted, join order is used once players join. */
   turnOrder?: string[];
   meta?: Record<string, unknown>;
 }

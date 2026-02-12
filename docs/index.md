@@ -4,63 +4,53 @@ layout: home
 hero:
   name: Neon Board
   text: Multiplayer Game Framework
-  tagline: Build board games, card games, and live multiplayer experiences with Firebase — no game server required.
+  tagline: One game config. Board applies it. Players submit actions. Firebase Firestore — no game server.
   image:
     src: /logo.png
     alt: Neon Board
   actions:
     - theme: brand
-      text: Start with Concepts
-      link: /guide/concepts
+      text: Start here
+      link: /guide/start-here
     - theme: alt
-      text: Getting started
-      link: /guide/getting-started
+      text: Game config
+      link: /guide/game-config
 
 features:
-  - icon: 🧠
-    title: "State + actions"
-    details: Define your game state and action reducers (like Flux). The board applies actions; everyone stays in sync.
+  - icon: 📋
+    title: "One game config"
+    details: "Define phases, moves (global + per-phase), setup, and lifecycle hooks in one object. Same config for create and for the board."
   - icon: 👥
-    title: "Multiplayer, realtime"
-    details: One shared game in Firestore. Board and players see the same state instantly across devices.
+    title: "Board + players"
+    details: "One device is the source of truth; others join and submit actions. Everyone sees the same state in real time."
   - icon: ⚛️
     title: "Hooks-first"
-    details: React hooks for create, join, state, and actions. Use the imperative API in vanilla JS or non-React code.
-  - icon: 📋
-    title: "Board as source of truth"
-    details: Only the board writes state and advances turn/phase. Simple rules, no conflicting writes.
+    details: "React hooks for create, join, state, and actions. Imperative API for vanilla JS or when you need it."
+  - icon: 🔄
+    title: "Lifecycle hooks"
+    details: "setup() at create; phase onBegin/onEnd; turn onEnd/onBegin. All driven by your config."
 ---
 
-<h2 style="text-align: center; padding-top: 3rem;">Where to go</h2>
+## Doc flow
 
-<div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; max-width: 400px; margin: 0 auto;">
-  <strong style="margin-top: 1rem;"><a href="/guide/concepts">Concepts</a></strong> How Neon Board works, turn-based vs phase-based games, and how to choose.
-  <strong style="margin-top: 1rem;"><a href="/guide/getting-started">Getting started</a></strong> Install, set up the provider, create/join a game, and wire up state and actions.
-  <strong style="margin-top: 1rem;"><a href="/guide/firestore">Firestore & rules</a></strong> Collection layout and security rules for your Firebase project.
-  <strong style="margin-top: 1rem;"><a href="/guide/reconnection">Reconnection</a></strong> Stored session and "Rejoin?" flow for returning players.
-  <strong style="margin-top: 1rem;"><a href="/api">API Reference</a></strong> Hooks, imperative API, and TypeScript types.
-</div>
+- **[Start here](/guide/start-here)** — What you need in four bullets. Links to Game config and Quick start.
+- **[Game config](/guide/game-config)** — The one object: setup, moves, turns, phases (start, next, onBegin, onEnd, moves).
+- **[Quick start](/guide/getting-started)** — Install, provider, create/join, wire board and players.
+- **[Concepts](/guide/concepts)** — Turn-based vs phase-based, terminology (optional).
+- **[Firestore & rules](/guide/firestore)** — Collections and security rules.
+- **[Reconnection](/guide/reconnection)** — Stored session and rejoin flow.
+- **[API Reference](/api)** — Hooks, imperative API, types (GameConfig, PhaseConfig, etc.).
 
-<h2 style="text-align: center; padding-top: 3rem;">Install</h2>
+## Install
 
-<div style="text-align: center;">
-   <div style="max-width:400px; margin:0 auto;">
-   
-   ```bash
-   npm install neon-board firebase
-   ```
-   
-   </div>
-  
-  <p style="margin-top: 0.75rem; font-size: 0.9rem;">Peer dependencies: <code>firebase</code> (v11+), <code>react</code> (v17+) if using hooks.</p>
-</div>
+```bash
+npm install neon-board firebase
+```
 
-<footer style="margin-top: 4rem;
-  margin-bottom: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid #222;
-  font-size: 0.875rem;
-  color: #555;
-  text-align: center;">
-  &copy; {{ new Date().getFullYear() }} Neon Board by Atomic10 Studio
+Peer deps: `firebase` (v11+), `react` (v17+) if using hooks.
+
+---
+
+<footer style="margin-top: 4rem; margin-bottom: 2rem; padding-top: 2rem; border-top: 1px solid var(--vp-c-divider); font-size: 0.875rem; color: var(--vp-c-text-2); text-align: center;">
+  © Neon Board by Atomic10 Studio
 </footer>

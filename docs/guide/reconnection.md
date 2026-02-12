@@ -1,3 +1,8 @@
+---
+prev: { text: 'Firestore & rules', link: '/guide/firestore' }
+next: { text: 'API Reference', link: '/api' }
+---
+
 # Reconnection
 
 When a user creates or joins a game, Neon Board stores a **session** in `localStorage` (key: `neon-board-session`). The session is valid for **7 days**. That lets you show a “Rejoin?” option when they open the app again — no need to re-enter the join code.

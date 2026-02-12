@@ -1,3 +1,8 @@
+---
+prev: { text: 'Concepts', link: '/guide/concepts' }
+next: { text: 'Reconnection', link: '/guide/reconnection' }
+---
+
 # Firestore layout and rules
 
 Neon Board uses one Firestore collection for games and a subcollection for pending actions. This page describes the layout and how to secure it so only the board writes game state and only players in the game can submit actions.
@@ -20,7 +25,7 @@ Neon Board uses one Firestore collection for games and a subcollection for pendi
   - `status` — `'waiting' | 'active' | 'ended'`.
 
 - **Subcollection:** `games/{gameId}/pendingActions`  
-  Players add documents here (action type, payload, playerId, createdAt). The board reads them, applies each with your action map, writes the new state, then deletes the action doc.
+  Players add documents here (action type, payload, playerId, createdAt). The board reads them, validates and applies each with your game config, writes the new state, then deletes the action doc.
 
 ---
 

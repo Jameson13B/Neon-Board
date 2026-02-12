@@ -16,28 +16,83 @@ import type {
   JoinGameResult,
   GameStateSnapshot,
   GameStatus,
+  GameConfig,
+  ActionContext,
+  SetupContext,
 } from './types.js';
 import { saveSession, loadSession, clearSession } from './reconnect.js';
 import {
   processPendingActions,
   getNextTurnUpdates,
   getNextPhaseUpdates,
+  getInitialPhaseFromConfig,
+  getPhaseOrderFromConfig,
+  runPhaseTransitionHooks,
+  runTurnHooks,
 } from './state.js';
-import type { ActionMap } from './types.js';
+
+/** Build action context for lifecycle hooks (playerId empty for system). */
+function toActionContext(
+  snapshot: Pick<GameStateSnapshot, 'context'>,
+  playerId: string
+): ActionContext {
+  const ctx = snapshot.context;
+  const currentPlayerId =
+    ctx.turnOrder.length > 0
+      ? ctx.turnOrder[ctx.currentPlayerIndex % ctx.turnOrder.length]
+      : undefined;
+  return {
+    playerId,
+    turn: ctx.turn,
+    round: ctx.round,
+    phase: ctx.phase,
+    status: ctx.status ?? 'active',
+    turnOrder: ctx.turnOrder,
+    currentPlayerIndex: ctx.currentPlayerIndex,
+    currentPlayerId,
+    phases: ctx.phases,
+  };
+}
 
 /**
  * Create a new game. Current user becomes the board.
+ * If options.gameConfig is set, phases and initialPhase are derived from config (phase with start: true, then next chain).
+ * If gameConfig.setup is set, it is called to produce initial state; otherwise options.initialState is used.
  */
 export async function createGame(
   db: Firestore,
   boardId: string,
   options?: CreateGameOptions
 ): Promise<CreateGameResult> {
+  const config = options?.gameConfig;
+  let phases: string[] | undefined;
+  let initialPhase: string | undefined;
+  let initialState: Record<string, unknown> | undefined = options?.initialState;
+
+  if (config) {
+    phases = getPhaseOrderFromConfig(config);
+    initialPhase = getInitialPhaseFromConfig(config);
+    if (config.setup) {
+      const setupContext: SetupContext = {
+        phase: initialPhase ?? '',
+        turn: 0,
+        round: 0,
+        status: 'waiting',
+        turnOrder: options?.turnOrder ?? [],
+        currentPlayerIndex: 0,
+      };
+      initialState = config.setup(setupContext) as Record<string, unknown>;
+    }
+  } else {
+    phases = options?.phases;
+    initialPhase = options?.initialPhase ?? (phases && phases.length > 0 ? phases[0] : undefined);
+  }
+
   const { gameId, joinCode } = await createGameInFirestore(db, {
     joinCode: options?.joinCode,
-    initialState: options?.initialState,
-    initialPhase: options?.initialPhase,
-    phases: options?.phases,
+    initialState,
+    initialPhase,
+    phases,
     turnOrder: options?.turnOrder,
     meta: options?.meta,
     boardId,
@@ -96,15 +151,17 @@ export function leaveGame(): void {
 
 /**
  * Advance to the next turn (next player in turn order, increment turn).
- * Board only. Pass current game snapshot from useGameState so the engine can compute the next state.
+ * Board only. If gameConfig is provided and has turns.onEnd/onBegin, those hooks run.
+ * Pass full snapshot (state + context) when using hooks.
  */
 export async function endTurn(
   db: Firestore,
   gameId: string,
-  current: Pick<GameStateSnapshot, 'context'>
+  current: Pick<GameStateSnapshot, 'state' | 'context'>,
+  gameConfig?: GameConfig
 ): Promise<void> {
   const ctx = current.context;
-  const updates = getNextTurnUpdates({
+  const doc = {
     turn: ctx.turn,
     round: ctx.round,
     phase: ctx.phase,
@@ -112,37 +169,64 @@ export async function endTurn(
     turnOrder: ctx.turnOrder,
     currentPlayerIndex: ctx.currentPlayerIndex,
     phases: ctx.phases,
-    state: {},
-  });
-  await mergeGameDoc(db, gameId, updates);
+    state: current.state ?? {},
+  };
+  const updates = getNextTurnUpdates(doc);
+  let state = current.state ?? {};
+  if (gameConfig?.turns && (gameConfig.turns.onEnd || gameConfig.turns.onBegin)) {
+    const currentCtx = toActionContext(current, '');
+    const nextIndex =
+      doc.turnOrder.length > 0 ? (doc.currentPlayerIndex + 1) % doc.turnOrder.length : 0;
+    const nextContext: ActionContext = {
+      ...currentCtx,
+      turn: doc.turn + 1,
+      currentPlayerIndex: nextIndex,
+      currentPlayerId:
+        doc.turnOrder.length > 0 ? doc.turnOrder[nextIndex] : undefined,
+      round: nextIndex === 0 ? doc.round + 1 : doc.round,
+    };
+    state = runTurnHooks(gameConfig, state, currentCtx, nextContext);
+  }
+  await mergeGameDoc(db, gameId, { ...updates, state });
 }
 
 /**
  * Advance to the next phase. If nextPhase is provided, jump to that phase;
  * otherwise advance by the game's phases list (if configured).
- * Board only.
+ * Board only. If gameConfig is provided, phase onEnd/onBegin hooks run for the transition.
  */
 export async function endPhase(
   db: Firestore,
   gameId: string,
-  current: Pick<GameStateSnapshot, 'context'>,
-  nextPhase?: string
+  current: Pick<GameStateSnapshot, 'state' | 'context'>,
+  nextPhase?: string,
+  gameConfig?: GameConfig
 ): Promise<void> {
   const ctx = current.context;
-  const updates = getNextPhaseUpdates(
-    {
-      turn: 0,
-      round: ctx.round,
-      phase: ctx.phase,
-      status: ctx.status,
-      turnOrder: ctx.turnOrder,
-      currentPlayerIndex: ctx.currentPlayerIndex,
-      phases: ctx.phases,
-      state: {},
-    },
-    nextPhase
-  );
-  if (updates) await mergeGameDoc(db, gameId, updates);
+  const doc = {
+    turn: 0,
+    round: ctx.round,
+    phase: ctx.phase,
+    status: ctx.status,
+    turnOrder: ctx.turnOrder,
+    currentPlayerIndex: ctx.currentPlayerIndex,
+    phases: ctx.phases,
+    state: {},
+  };
+  const updates = getNextPhaseUpdates(doc, nextPhase);
+  if (!updates) return;
+  let state = current.state ?? {};
+  const nextPhaseName = updates.phase ?? nextPhase;
+  if (gameConfig?.phases && nextPhaseName) {
+    state = runPhaseTransitionHooks(
+      gameConfig,
+      ctx.phase,
+      nextPhaseName,
+      state,
+      toActionContext(current, '')
+    );
+  }
+  await mergeGameDoc(db, gameId, { ...updates, state });
 }
 
 /**
@@ -189,4 +273,4 @@ export {
   processPendingActions,
 };
 
-export type { ActionMap, GameStateSnapshot } from './types.js';
+export type { GameConfig, GameStateSnapshot } from './types.js';

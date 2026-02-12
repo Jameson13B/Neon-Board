@@ -1,4 +1,4 @@
-import type { ActionMap, GameDoc, ActionContext } from './types.js';
+import type { GameConfig, GameDoc, ActionContext, ActionReducer } from './types.js';
 import type { Firestore } from 'firebase/firestore';
 import { mergeGameDoc, deletePendingAction } from './firestore.js';
 
@@ -29,17 +29,74 @@ function toActionContext(
 }
 
 /**
- * Apply a single pending action using the provided action map (board only).
- * Returns new state or null if action type unknown / reducer throws.
+ * Derive the initial phase from config: the phase with start: true, or the first phase key.
+ */
+export function getInitialPhaseFromConfig(config: GameConfig): string {
+  const phases = config.phases;
+  if (!phases || Object.keys(phases).length === 0) return '';
+  const withStart = Object.entries(phases).find(([, p]) => p.start === true);
+  if (withStart) return withStart[0];
+  return Object.keys(phases)[0];
+}
+
+/**
+ * Derive ordered phase list from config: start from initial phase, follow next until no next or cycle.
+ */
+export function getPhaseOrderFromConfig(config: GameConfig): string[] {
+  const phases = config.phases;
+  if (!phases || Object.keys(phases).length === 0) return [];
+  const order: string[] = [];
+  let current = getInitialPhaseFromConfig(config);
+  const seen = new Set<string>();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    order.push(current);
+    const next = phases[current]?.next;
+    current = next && phases[next] ? next : '';
+  }
+  return order;
+}
+
+/**
+ * Allowed move types for a phase: top-level moves ∪ phases[phase].moves (object keys).
+ */
+export function getAllowedMoveTypes(config: GameConfig, phase: string): Set<string> {
+  const set = new Set<string>(Object.keys(config.moves ?? {}));
+  const phaseMoves = config.phases?.[phase]?.moves;
+  if (phaseMoves && typeof phaseMoves === 'object') {
+    Object.keys(phaseMoves).forEach((m) => set.add(m));
+  }
+  return set;
+}
+
+/**
+ * Get the reducer for an action type in a given phase (global moves or phase moves).
+ */
+function getReducer(
+  config: GameConfig,
+  phase: string,
+  actionType: string
+): ActionReducer | undefined {
+  const global = config.moves?.[actionType];
+  if (global) return global;
+  return config.phases?.[phase]?.moves?.[actionType];
+}
+
+/**
+ * Apply a single pending action using the game config (board only).
+ * Rejects if action type is not allowed in the current phase (engine validation).
+ * Returns new state or null if not allowed / unknown / reducer throws.
  */
 export function applyAction(
   currentState: Record<string, unknown>,
   actionType: string,
   payload: Record<string, unknown>,
   context: ActionContext,
-  actionMap: ActionMap
+  gameConfig: GameConfig
 ): Record<string, unknown> | null {
-  const reducer = actionMap[actionType];
+  const allowed = getAllowedMoveTypes(gameConfig, context.phase);
+  if (!allowed.has(actionType)) return null;
+  const reducer = getReducer(gameConfig, context.phase, actionType);
   if (!reducer || typeof reducer !== 'function') return null;
   try {
     return reducer(currentState, payload, context) as Record<string, unknown>;
@@ -57,7 +114,7 @@ export async function processPendingActions(
   gameId: string,
   currentDoc: GameDocTurnPhase,
   actions: Array<{ id: string; type: string; payload: Record<string, unknown>; playerId: string; createdAt: number }>,
-  actionMap: ActionMap
+  gameConfig: GameConfig
 ): Promise<void> {
   let state = { ...currentDoc.state };
   const turn = currentDoc.turn;
@@ -79,7 +136,7 @@ export async function processPendingActions(
       currentPlayerIndex,
       phases,
     });
-    const newState = applyAction(state, a.type, a.payload, context, actionMap);
+    const newState = applyAction(state, a.type, a.payload, context, gameConfig);
     if (newState != null) {
       state = newState;
       await deletePendingAction(db, gameId, a.id);
@@ -142,4 +199,69 @@ export function getNextPhaseUpdates(
     phase: phases[nextIndex],
     ...(wrappedToFirst ? { round: doc.round + 1 } : {}),
   };
+}
+
+const emptyPayload: Record<string, unknown> = {};
+
+/**
+ * Run phase transition hooks: currentPhase.onEnd then nextPhase.onBegin.
+ * Returns the final state after both hooks. Uses empty payload; context.phase updated for onBegin.
+ */
+export function runPhaseTransitionHooks(
+  config: GameConfig,
+  currentPhaseName: string,
+  nextPhaseName: string,
+  state: Record<string, unknown>,
+  context: ActionContext
+): Record<string, unknown> {
+  let s = state;
+  const currentPhase = config.phases?.[currentPhaseName];
+  if (currentPhase?.onEnd && typeof currentPhase.onEnd === 'function') {
+    try {
+      s = currentPhase.onEnd(s, emptyPayload, context) as Record<string, unknown>;
+    } catch {
+      // keep state on hook error
+    }
+  }
+  const nextContext: ActionContext = { ...context, phase: nextPhaseName };
+  const nextPhase = config.phases?.[nextPhaseName];
+  if (nextPhase?.onBegin && typeof nextPhase.onBegin === 'function') {
+    try {
+      s = nextPhase.onBegin(s, emptyPayload, nextContext) as Record<string, unknown>;
+    } catch {
+      // keep state on hook error
+    }
+  }
+  return s;
+}
+
+/**
+ * Run turn lifecycle hooks: turns.onEnd (current turn) then turns.onBegin (next turn).
+ * Pass state and current context for onEnd; for onBegin pass context with updated turn/currentPlayerIndex.
+ * Returns the final state after both hooks.
+ */
+export function runTurnHooks(
+  config: GameConfig,
+  state: Record<string, unknown>,
+  currentContext: ActionContext,
+  nextContext: ActionContext
+): Record<string, unknown> {
+  let s = state;
+  const turns = config.turns;
+  if (!turns) return s;
+  if (turns.onEnd && typeof turns.onEnd === 'function') {
+    try {
+      s = turns.onEnd(s, emptyPayload, currentContext) as Record<string, unknown>;
+    } catch {
+      // keep state on hook error
+    }
+  }
+  if (turns.onBegin && typeof turns.onBegin === 'function') {
+    try {
+      s = turns.onBegin(s, emptyPayload, nextContext) as Record<string, unknown>;
+    } catch {
+      // keep state on hook error
+    }
+  }
+  return s;
 }

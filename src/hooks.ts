@@ -16,7 +16,7 @@ import {
 } from './api.js';
 import type {
   GameStateSnapshot,
-  ActionMap,
+  GameConfig,
   CreateGameOptions,
   JoinGameOptions,
   GameStatus,
@@ -138,14 +138,14 @@ export function useSubmitAction(gameId: string | null, playerId: string | null) 
 }
 
 /**
- * Board only: subscribe to pending actions and apply them with your action map.
+ * Board only: subscribe to pending actions and apply them with your game config.
  * Call once in the board UI; keeps state in sync with Firestore.
  */
 export function useBoardActions(
   gameId: string | null,
   role: 'board' | 'player' | null,
   currentState: GameStateSnapshot | null,
-  actionMap: ActionMap
+  gameConfig: GameConfig
 ) {
   const { db } = useNeonBoardContext();
   const processing = useRef(false);
@@ -176,7 +176,7 @@ export function useBoardActions(
             phases: ctx.phases,
           },
           actions,
-          actionMap
+          gameConfig
         );
         lastProcessed.current = key;
       } finally {
@@ -185,40 +185,43 @@ export function useBoardActions(
     });
 
     return () => unsub();
-  }, [db, gameId, role, currentState?.state, currentState?.context, actionMap]);
+  }, [db, gameId, role, currentState?.state, currentState?.context, gameConfig]);
 }
 
 /**
  * Board only: advance to the next turn (next player, increment turn).
- * Uses current game state from useGameState; call the returned function when you want to end the turn.
+ * Pass gameConfig to run turns.onEnd / turns.onBegin hooks.
  */
 export function useEndTurn(
   gameId: string | null,
   role: 'board' | 'player' | null,
-  currentState: GameStateSnapshot | null
+  currentState: GameStateSnapshot | null,
+  gameConfig?: GameConfig
 ) {
   const { db } = useNeonBoardContext();
   return useCallback(async () => {
     if (!gameId || role !== 'board' || !currentState) return;
-    await endTurn(db, gameId, currentState);
-  }, [db, gameId, role, currentState]);
+    await endTurn(db, gameId, currentState, gameConfig);
+  }, [db, gameId, role, currentState, gameConfig]);
 }
 
 /**
- * Board only: advance to the next phase. Call with optional nextPhase to jump to a specific phase, or omit to use the configured phases list.
+ * Board only: advance to the next phase. Pass gameConfig to run phase onEnd/onBegin hooks.
+ * Call with optional nextPhase to jump to a specific phase, or omit to use the configured phases list.
  */
 export function useEndPhase(
   gameId: string | null,
   role: 'board' | 'player' | null,
-  currentState: GameStateSnapshot | null
+  currentState: GameStateSnapshot | null,
+  gameConfig?: GameConfig
 ) {
   const { db } = useNeonBoardContext();
   return useCallback(
     async (nextPhase?: string) => {
       if (!gameId || role !== 'board' || !currentState) return;
-      await endPhase(db, gameId, currentState, nextPhase);
+      await endPhase(db, gameId, currentState, nextPhase, gameConfig);
     },
-    [db, gameId, role, currentState]
+    [db, gameId, role, currentState, gameConfig]
   );
 }
 

@@ -5,61 +5,50 @@ next: { text: 'Hooks', link: '/api/hooks' }
 
 # API Reference
 
-Neon Board exposes a **React API** (provider + hooks), an **imperative API** (standalone functions for use without React or inside effects), and **TypeScript types**. Use the provider and hooks in React apps; use the imperative API in vanilla JS or when you need to call the same logic outside components.
+Your game is defined by a **game config** (**GameConfig**): **setup**, **moves** (global), **turns** (onBegin/onEnd), and **phases** (each with **start**, **next**, **onBegin**, **onEnd**, **moves**). Pass the same config to **createGame**, **useBoardActions**, and **useEndTurn** / **useEndPhase**. Full shape: [Game config](/guide/game-config) and [Types](/api/types).
 
 ---
 
-## React (provider + hooks)
+## React (hooks)
 
 | Export | Description |
 |--------|-------------|
-| **NeonBoardProvider** | Wraps your app; provides `db`, `getCurrentUserId`, and optional `getBoardId`. |
-| **useNeonBoardContext()** | Returns `{ db, getCurrentUserId, getBoardId }`. Use inside the provider. |
-| **useCreateGame()** | Create a game (caller = board). Returns `createGame`, `gameId`, `joinCode`, `error`, `loading`. |
-| **useJoinGame()** | Join by code. Returns `joinGame`, `gameId`, `joinCode`, `role`, `playerId`, `error`, `loading`. |
-| **useGameState(gameId)** | Subscribe to live game. Returns `GameStateSnapshot \| null`. |
-| **useSubmitAction(gameId, playerId)** | Submit an action (players). Returns `submitAction`, `error`. |
-| **useBoardActions(gameId, role, snapshot, actionMap)** | Board only. Applies pending actions with your action map. |
-| **useEndTurn(gameId, role, snapshot)** | Board only. Advance to next player; increment turn (and round when wrapping). |
-| **useEndPhase(gameId, role, snapshot)** | Board only. Advance to next phase (or pass `nextPhase` to jump). |
-| **useSetPhase(gameId, role)** | Board only. Set phase to a specific value. |
-| **useSetTurnOrder(gameId, role)** | Board only. Set turn order (player IDs). |
-| **useSetStatus(gameId, role)** | Board only. Set game status (e.g. `'ended'`). |
-| **useStoredSession()** | Last stored session for reconnection (`JoinGameResult \| null`). |
-| **useLeaveGame()** | Returns `leaveGame()` to clear stored session. |
+| **NeonBoardProvider** | Wraps app; provides db, getCurrentUserId, getBoardId. |
+| **useNeonBoardContext()** | Returns { db, getCurrentUserId, getBoardId }. |
+| **useCreateGame()** | createGame(options). Pass **gameConfig** so phases/setup come from it. |
+| **useJoinGame()** | joinGame(code). |
+| **useGameState(gameId)** | Live snapshot (state, context, meta). |
+| **useSubmitAction(gameId, playerId)** | submitAction(type, payload). |
+| **useBoardActions(gameId, role, snapshot, gameConfig)** | Board only. Applies pending actions with gameConfig. |
+| **useEndTurn(gameId, role, snapshot, gameConfig?)** | Board only. Advance turn. Pass gameConfig to run turns.onEnd/onBegin. |
+| **useEndPhase(gameId, role, snapshot, gameConfig?)** | Board only. Advance phase. Pass gameConfig to run phase onEnd/onBegin. |
+| **useSetPhase**, **useSetTurnOrder**, **useSetStatus** | Board only. |
+| **useStoredSession()**, **useLeaveGame()** | Reconnection. |
 
 ---
 
 ## Imperative API
 
-Use when not using React or when calling from outside components. Pass a Firestore instance; for create/join, pass board or player id as needed.
+Same functions for use without React. Pass **db**, **gameId**, and snapshot/options as needed.
 
 | Function | Description |
 |----------|-------------|
-| **createGame(db, boardId, options?)** | Create a game; caller is board. Saves session. Returns `Promise<CreateGameResult>`. |
-| **joinGame(db, joinCode, playerId, options?)** | Find by join code and add user. Saves session. Returns `Promise<JoinGameResult>`. Throws if not found. |
-| **getOrCreateBoardId(options?)** | Persistent board id for this device (e.g. board-only, no auth). Uses localStorage. |
-| **getStoredSession()** | Load last session. Returns `JoinGameResult \| null`. |
-| **leaveGame()** | Clear stored session. |
-| **subscribeToGame(db, gameId, onUpdate)** | Subscribe to game doc. `onUpdate(snapshot: GameStateSnapshot)`. Returns unsubscribe. |
-| **subscribeToPendingActions(db, gameId, onActions)** | Subscribe to pending actions (by createdAt). Returns unsubscribe. |
-| **addPendingAction(db, gameId, playerId, type, payload)** | Add a pending action (players). Returns `Promise<string>` (action id). |
-| **updateGameState(db, gameId, updates)** | Board only. **Only `state` and `meta`** are writable. |
-| **endTurn(db, gameId, current)** | Board only. Advance turn; pass snapshot (with `context`). |
-| **endPhase(db, gameId, current, nextPhase?)** | Board only. Advance phase; pass snapshot. Optional `nextPhase` to jump. |
-| **setPhase(db, gameId, phase)** | Board only. Set phase to a value. |
-| **setTurnOrder(db, gameId, turnOrder)** | Board only. Set turn order (player IDs). |
-| **setStatus(db, gameId, status)** | Board only. Set status (e.g. `'ended'`). |
-| **processPendingActions(db, gameId, currentDoc, actions, actionMap)** | Board only. Apply actions, update Firestore, delete processed actions. |
+| **createGame(db, boardId, options?)** | Create game. Use **options.gameConfig** for phases and setup. |
+| **joinGame(db, joinCode, playerId, options?)** | Join by code. |
+| **processPendingActions(db, gameId, currentDoc, actions, gameConfig)** | Board only. Apply actions with gameConfig. |
+| **endTurn(db, gameId, current, gameConfig?)** | Board only. Pass full snapshot; gameConfig for turn hooks. |
+| **endPhase(db, gameId, current, nextPhase?, gameConfig?)** | Board only. gameConfig for phase hooks. |
+| **setPhase**, **setTurnOrder**, **setStatus** | Board only. |
+| **subscribeToGame**, **subscribeToPendingActions**, **addPendingAction**, **updateGameState** | Subscribe and write. |
 
 ---
 
-## Types
+## Types and helpers
 
-All public types are exported from `neon-board`: **Role**, **GameStatus**, **GameDoc**, **GameContext**, **GameStateSnapshot**, **ActionMap**, **ActionReducer**, **ActionContext**, **CreateGameOptions**, **JoinGameOptions**, **CreateGameResult**, **JoinGameResult**, **StoredSession**, and more.
+**GameConfig**, **PhaseConfig**, **TurnConfig**, **SetupContext**, **ActionReducer**, **ActionContext**, **GameStateSnapshot**, **GameContext**, **CreateGameOptions**, **JoinGameOptions**, and more. **getInitialPhaseFromConfig**, **getPhaseOrderFromConfig**, **getAllowedMoveTypes** — see [Types](/api/types).
 
 | Page | Description |
 |------|-------------|
-| [Hooks](/api/hooks) | Provider, context, and every hook in detail. |
-| [Imperative API](/api/imperative) | All standalone functions with examples. |
-| [Types](/api/types) | TypeScript interfaces and types. |
+| [Types](/api/types) | GameConfig shape, PhaseConfig, TurnConfig, snapshot, options. |
+| [Hooks](/api/hooks) | Each hook in detail. |
+| [Imperative API](/api/imperative) | All functions with examples. |

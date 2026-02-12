@@ -48,7 +48,10 @@ export type {
   PendingActionDoc,
   ActionReducer,
   ActionContext,
-  ActionMap,
+  SetupContext,
+  TurnConfig,
+  GameConfig,
+  PhaseConfig,
   CreateGameOptions,
   JoinGameOptions,
   CreateGameResult,
@@ -57,4 +60,10 @@ export type {
   GameStateSnapshot,
 } from './types.js';
 export type { GameDocTurnPhase } from './state.js';
-export { getNextTurnUpdates, getNextPhaseUpdates } from './state.js';
+export {
+  getNextTurnUpdates,
+  getNextPhaseUpdates,
+  getAllowedMoveTypes,
+  getInitialPhaseFromConfig,
+  getPhaseOrderFromConfig,
+} from './state.js';

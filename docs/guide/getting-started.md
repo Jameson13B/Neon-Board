@@ -1,8 +1,11 @@
-# Getting started
+---
+prev: { text: 'Game config', link: '/guide/game-config' }
+next: { text: 'Concepts', link: '/guide/concepts' }
+---
 
-Read [Concepts](/guide/concepts) first for a high-level overview and to choose turn-based vs phase-based for your game.
+# Quick start
 
-By the end of this guide you’ll have: a game that can be created and joined, live state on all devices, players submitting actions, and the board applying them. Optionally you’ll see how to advance turn or phase from the board.
+Get a game running in a few steps. You need: a **game config**, a **provider**, **create/join**, and the board applying actions with the same config. See [Game config](/guide/game-config) for the full shape.
 
 ---
 
@@ -12,217 +15,121 @@ By the end of this guide you’ll have: a game that can be created and joined, l
 npm install neon-board firebase
 ```
 
-**Peer dependencies:** `firebase` (v11+), `react` (v17+) if you use the hooks.
+Peer deps: `firebase` (v11+), `react` (v17+) if you use hooks.
 
 ---
 
-## 2. Set up the provider
+## 2. Provider
 
-You need a Firestore instance and a way to identify the **board** and **players**.
+Wrap your app with **NeonBoardProvider**. You need **db** (Firestore) and either **getCurrentUserId** (players) or **getBoardId** (board), or both.
 
-- **Board** — The device that runs the game (TV, shared screen). It doesn’t need user auth; Neon Board can generate and persist a board id (e.g. in `localStorage`).
-- **Players** — Devices that join and submit actions. They usually have a user id (e.g. from Firebase Auth).
-
-**Board-only app (no auth):**
+**Board-only (no auth):**
 
 ```jsx
-import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { NeonBoardProvider, getOrCreateBoardId } from 'neon-board';
 
-const app = initializeApp({ /* your config */ });
-const db = getFirestore(app);
-
-export default function BoardApp() {
-  return (
-    <NeonBoardProvider
-      db={db}
-      getCurrentUserId={() => null}
-      getBoardId={getOrCreateBoardId}
-    >
-      <GameApp />
-    </NeonBoardProvider>
-  );
-}
+<NeonBoardProvider db={db} getCurrentUserId={() => null} getBoardId={getOrCreateBoardId}>
+  <App />
+</NeonBoardProvider>
 ```
 
-`getOrCreateBoardId` returns a persistent id for this device (stored in `localStorage`). You can pass options: `getOrCreateBoardId({ storageKey: 'my-app-board-id' })`.
-
-**Player app (with auth):**
+**With auth (players):**
 
 ```jsx
-import { getAuth } from 'firebase/auth';
-import { NeonBoardProvider } from 'neon-board';
-
-function getCurrentUserId() {
-  return getAuth(app).currentUser?.uid ?? null;
-}
-
-export default function PlayerApp() {
-  return (
-    <NeonBoardProvider db={db} getCurrentUserId={getCurrentUserId}>
-      <GameApp />
-    </NeonBoardProvider>
-  );
-}
-```
-
-**One app for both (e.g. different routes):** Pass both `getBoardId` and `getCurrentUserId`. Creating a game uses the board id; joining uses the current user id.
-
----
-
-## 3. Create or join a game
-
-**Create a game (this device becomes the board):**
-
-```jsx
-import { useCreateGame } from 'neon-board';
-
-function CreateScreen() {
-  const { createGame, gameId, joinCode, error, loading } = useCreateGame();
-
-  const handleCreate = async () => {
-    const result = await createGame({
-      initialState: { score: 0 },
-      initialPhase: 'lobby',
-      // Optional: turn-based (use join order as turn order) or phase-based:
-      // phases: ['lobby', 'play', 'ended'],
-      // turnOrder: [],  // or pass player ids when you want a fixed order
-    });
-    if (result) {
-      // Go to board view; show result.joinCode so others can join
-    }
-  };
-
-  return (
-    <button onClick={handleCreate} disabled={loading}>
-      {loading ? 'Creating…' : 'New game'}
-    </button>
-  );
-}
-```
-
-**Join as a player (by code):**
-
-```jsx
-import { useState } from 'react';
-import { useJoinGame } from 'neon-board';
-
-function JoinScreen() {
-  const [code, setCode] = useState('');
-  const { joinGame, gameId, role, playerId, error, loading } = useJoinGame();
-
-  const handleJoin = async () => {
-    await joinGame(code);
-    // Go to game view; role is 'board' or 'player'
-  };
-
-  return (
-    <>
-      <input
-        value={code}
-        onChange={(e) => setCode(e.target.value.toUpperCase())}
-        placeholder="Join code"
-      />
-      <button onClick={handleJoin} disabled={loading}>Join</button>
-    </>
-  );
-}
+<NeonBoardProvider db={db} getCurrentUserId={() => getAuth().currentUser?.uid ?? null}>
+  <App />
+</NeonBoardProvider>
 ```
 
 ---
 
-## 4. Read state and submit actions
+## 3. Game config (one place)
 
-**Read live state (any role):**
-
-Every subscriber gets the same snapshot: **`state`** (your game data), **`context`** (turn, phase, round, whose turn, etc.), and **`meta`** (optional).
+Define your config once. Use **phases** with **start**, **next**, and **moves** (colocated). Top-level **moves** = global (any phase).
 
 ```jsx
-import { useGameState } from 'neon-board';
-
-function GameView({ gameId }) {
-  const snapshot = useGameState(gameId);
-  if (!snapshot) return <div>Loading…</div>;
-  return (
-    <div>
-      <p>Phase: {snapshot.context.phase}, Turn: {snapshot.context.turn}</p>
-      <p>Score: {snapshot.state.score ?? 0}</p>
-    </div>
-  );
-}
-```
-
-**Players submit actions:**
-
-```jsx
-import { useSubmitAction } from 'neon-board';
-
-function PlayerControls({ gameId, playerId }) {
-  const { submitAction, error } = useSubmitAction(gameId, playerId);
-  return (
-    <button onClick={() => submitAction('increment', { amount: 1 })}>
-      +1
-    </button>
-  );
-}
-```
-
-**Board applies actions:**
-
-Define an **action map**: each key is an action type, each value is a reducer `(state, payload, context) => newState`. The board subscribes to pending actions and runs them through this map. Memoize **`actionMap`** (e.g. with `useMemo`) so the effect doesn’t re-run every render.
-
-```jsx
-import { useGameState, useBoardActions } from 'neon-board';
 import { useMemo } from 'react';
+import type { GameConfig } from 'neon-board';
 
-function BoardView({ gameId, role }) {
-  const snapshot = useGameState(gameId);
-  const actionMap = useMemo(() => ({
-    increment(state, payload, context) {
-      const amount = payload.amount ?? 1;
-      return { ...state, score: (state.score ?? 0) + amount };
+function useGameConfig() {
+  return useMemo((): GameConfig => ({
+    phases: {
+      play: {
+        start: true,
+        moves: {
+          increment(state, payload) {
+            return { ...state, score: (state.score ?? 0) + (payload.amount ?? 1) };
+          },
+        },
+      },
     },
   }), []);
-  useBoardActions(gameId, role, snapshot, actionMap);
-
-  return <div>Board: {JSON.stringify(snapshot?.state)}</div>;
 }
 ```
 
 ---
 
-## 5. Advance turn or phase (board only)
+## 4. Create game (board)
 
-When the current player’s turn is over (turn-based) or the current phase is done (phase-based), the **board** calls **`endTurn()`** or **`endPhase()`**. Pass the current snapshot (from **`useGameState`**); the engine updates turn/phase/round.
+Pass **gameConfig** so phases and initial phase come from it. Same config will be used for the board below.
 
 ```jsx
-import { useGameState, useEndTurn, useEndPhase } from 'neon-board';
+const gameConfig = useGameConfig();
+const { createGame, joinCode } = useCreateGame();
 
-function BoardControls({ gameId, role }) {
-  const snapshot = useGameState(gameId);
-  const endTurn = useEndTurn(gameId, role, snapshot);
-  const endPhase = useEndPhase(gameId, role, snapshot);
-
-  return (
-    <>
-      <button onClick={() => endTurn()} disabled={role !== 'board' || !snapshot}>
-        End turn
-      </button>
-      <button onClick={() => endPhase()} disabled={role !== 'board' || !snapshot}>
-        Next phase
-      </button>
-    </>
-  );
-}
+await createGame({ gameConfig, initialState: { score: 0 } });
+// Show joinCode so players can join
 ```
-
-Use **`endPhase(nextPhase)`** to jump to a specific phase (e.g. `endPhase('ended')`). Use **`setPhase(db, gameId, phase)`** or **`setStatus(db, gameId, 'ended')`** for full control.
 
 ---
 
-## Next steps
+## 5. Join (players)
 
-- **[Firestore & rules](/guide/firestore)** — Set up the `games` collection and security rules so only the board can write state and only players in the game can submit actions.
-- **[Reconnection](/guide/reconnection)** — Use the stored session to show a “Rejoin?” option when users return.
-- **[API Reference](/api/)** — Hooks, imperative API, and types for everything above.
+```jsx
+const { joinGame } = useJoinGame();
+await joinGame(joinCode);
+```
+
+---
+
+## 6. Read state (any role)
+
+```jsx
+const snapshot = useGameState(gameId);
+// snapshot.state, snapshot.context (phase, turn, currentPlayerId, etc.)
+```
+
+---
+
+## 7. Submit actions (players)
+
+```jsx
+const { submitAction } = useSubmitAction(gameId, playerId);
+submitAction('increment', { amount: 1 });
+```
+
+---
+
+## 8. Board: apply actions and advance
+
+Pass the **same gameConfig** to **useBoardActions**, **useEndTurn**, and **useEndPhase** so the engine validates moves and runs lifecycle hooks.
+
+```jsx
+const gameConfig = useGameConfig();
+const snapshot = useGameState(gameId);
+
+useBoardActions(gameId, role, snapshot, gameConfig);
+
+const endTurn  = useEndTurn(gameId, role, snapshot, gameConfig);
+const endPhase = useEndPhase(gameId, role, snapshot, gameConfig);
+// Call endTurn() or endPhase() when the board decides (e.g. button click)
+```
+
+---
+
+## Next
+
+- [Concepts](/guide/concepts) — Turn-based vs phase-based, terminology.
+- [Firestore & rules](/guide/firestore) — Collections and security rules.
+- [API Reference](/api) — Hooks, imperative API, **GameConfig** types.

@@ -5,7 +5,7 @@ export default {
   head: [["link", { rel: "icon", href: "/logo.png" }]],
   themeConfig: {
     nav: [
-      { text: "Guide", link: "/guide/concepts" },
+      { text: "Guide", link: "/guide/start-here" },
       { text: "API", link: "/api" },
       { text: "GitHub", link: "https://github.com/jameson13b/neon-board" },
     ],
@@ -16,8 +16,10 @@ export default {
       {
         text: "Guide",
         items: [
+          { text: "Start here", link: "/guide/start-here" },
+          { text: "Game config", link: "/guide/game-config" },
+          { text: "Quick start", link: "/guide/getting-started" },
           { text: "Concepts", link: "/guide/concepts" },
-          { text: "Getting started", link: "/guide/getting-started" },
           { text: "Firestore & rules", link: "/guide/firestore" },
           { text: "Reconnection", link: "/guide/reconnection" },
         ],

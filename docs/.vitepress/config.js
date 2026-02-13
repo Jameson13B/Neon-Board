@@ -1,5 +1,7 @@
+import packageJson from "../../package.json"
+
 export default {
-  title: "Neon Board | Atomic10 Studio",
+  title: "Neon Board",
   description:
     "Lightweight multiplayer game framework with Firebase Firestore — board + clients or clients-only, hooks-first API",
   head: [["link", { rel: "icon", href: "/logo.png" }]],
@@ -7,7 +9,10 @@ export default {
     nav: [
       { text: "Guide", link: "/guide/start-here" },
       { text: "API", link: "/api/" },
-      { text: "GitHub", link: "https://github.com/jameson13b/neon-board" },
+      {
+        text: `Version ${packageJson.version}`,
+        link: "https://npmjs.com/package/neon-board",
+      },
     ],
     search: {
       provider: "local",
@@ -33,6 +38,10 @@ export default {
           { text: "Types", link: "/api/types" },
         ],
       },
+      {
+        text: "Built by Atomic10 Studio",
+        link: "https://www.atomic10.studio",
+      },
     ],
     socialLinks: [
       {
@@ -41,8 +50,7 @@ export default {
         },
         link: "https://www.atomic10.studio",
       },
-      { icon: "github", link: "https://github.com/jameson13b" },
-      { icon: "medium", link: "https://medium.com/@jamesonbrown" },
+      { icon: "github", link: "https://github.com/jameson13b/neon-board" },
     ],
   },
 }

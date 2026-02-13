@@ -1,6 +1,6 @@
 {
   "name": "neon-board",
-  "version": "0.1.0",
+  "version": "0.0.1-beta.1",
   "description": "Lightweight multiplayer game framework with Firebase Firestore. Build board games, card games, and live multiplayer experiences with Firebase — no game server required.",
   "type": "module",
   "main": "./dist/index.js",

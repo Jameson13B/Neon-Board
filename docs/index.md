@@ -52,5 +52,5 @@ Peer deps: `firebase` (v11+), `react` (v17+) if using hooks.
 ---
 
 <footer style="margin-top: 4rem; margin-bottom: 2rem; padding-top: 2rem; border-top: 1px solid var(--vp-c-divider); font-size: 0.875rem; color: var(--vp-c-text-2); text-align: center;">
-  © Neon Board by Atomic10 Studio
+  © Neon Board by <a href="https://www.atomic10.studio" target="_blank" rel="noopener noreferrer">Atomic10 Studio</a>
 </footer>

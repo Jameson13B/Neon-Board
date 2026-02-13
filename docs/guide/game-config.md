@@ -30,7 +30,6 @@ const gameConfig: GameConfig = {
   // Global moves that are allowed in any phase.
   moves: {
     A: (state, payload, context) => ({ ...state, /* ... */ }),
-    B: (state, payload, context) => ({ ...state, /* ... */ }),
   },
 
   turns: {

@@ -12,7 +12,7 @@ Neon Board is a multiplayer game framework that keeps one shared game in sync ac
 ## What you need
 
 1. **A game config** — One object: phases, moves (global and per-phase), and optional setup/lifecycle hooks. [Define it →](/guide/game-config)
-2. **Create a game** — Pass that config to **createGame**. Phases and initial state (or **setup()**) come from the config.
+2. **Create a game** — Pass that config to **createGame**. Phases and initial state come from the config.
 3. **Board applies actions** — Pass the same config to **useBoardActions** so the board validates and runs the right reducers. Use the same config with **endTurn** / **endPhase** so lifecycle hooks run.
 4. **Players submit actions** — **submitAction(type, payload)**. The engine only allows moves that are valid for the current phase.
 

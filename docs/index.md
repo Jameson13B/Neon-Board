@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Neon Board
   text: Multiplayer Game Framework
-  tagline: One game config. Board applies it. Players submit actions. Firebase Firestore — no game server.
+  tagline: "One game config. Real-time multiplayer powered by Firebase — no server required."
   image:
     src: /logo.png
     alt: Neon Board

@@ -21,11 +21,11 @@ import type {
   JoinGameOptions,
   GameStatus,
 } from './types.js';
-import { useNeonBoardContext } from './context.js';
+import { useNeonGameContext, useNeonBoardContext } from './context.js';
 
 /** Create a new game (caller becomes board). Uses getBoardId() if provided, else getCurrentUserId(). */
 export function useCreateGame() {
-  const { db, getCurrentUserId, getBoardId } = useNeonBoardContext();
+  const { db, getCurrentUserId, getBoardId, gameConfig: contextConfig } = useNeonGameContext();
   const [gameId, setGameId] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -41,7 +41,11 @@ export function useCreateGame() {
       setLoading(true);
       setError(null);
       try {
-        const result = await createGame(db, boardId, options);
+        const finalOptions = { ...options };
+        if (!finalOptions.gameConfig && contextConfig) {
+          finalOptions.gameConfig = contextConfig;
+        }
+        const result = await createGame(db, boardId, finalOptions);
         setGameId(result.gameId);
         setJoinCode(result.joinCode);
         return result;
@@ -53,7 +57,7 @@ export function useCreateGame() {
         setLoading(false);
       }
     },
-    [db, getCurrentUserId, getBoardId]
+    [db, getCurrentUserId, getBoardId, contextConfig]
   );
 
   return { createGame: create, gameId, joinCode, error, loading };
@@ -61,7 +65,7 @@ export function useCreateGame() {
 
 /** Join a game by join code. */
 export function useJoinGame() {
-  const { db, getCurrentUserId } = useNeonBoardContext();
+  const { db, getCurrentUserId } = useNeonGameContext();
   const [gameId, setGameId] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [role, setRole] = useState<'board' | 'player' | null>(null);
@@ -101,7 +105,7 @@ export function useJoinGame() {
 
 /** Subscribe to live game state. */
 export function useGameState(gameId: string | null) {
-  const { db } = useNeonBoardContext();
+  const { db } = useNeonGameContext();
   const [snapshot, setSnapshot] = useState<GameStateSnapshot | null>(null);
 
   useEffect(() => {
@@ -117,21 +121,28 @@ export function useGameState(gameId: string | null) {
 }
 
 /** Submit an action (players). Board ignores this and uses useBoardActions instead. */
-export function useSubmitAction(gameId: string | null, playerId: string | null) {
-  const { db } = useNeonBoardContext();
+export function useSubmitAction(
+  gameId?: string | null,
+  playerId?: string | null
+) {
+  const { db, getCurrentUserId } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
   const [error, setError] = useState<Error | null>(null);
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalPlayerId = playerId ?? getCurrentUserId();
 
   const submit = useCallback(
     async (type: string, payload?: Record<string, unknown>) => {
-      if (!gameId || !playerId) return;
+      if (!finalGameId || !finalPlayerId) return;
       setError(null);
       try {
-        await addPendingAction(db, gameId, playerId, type, payload ?? {});
+        await addPendingAction(db, finalGameId, finalPlayerId, type, payload ?? {});
       } catch (e) {
         setError(e instanceof Error ? e : new Error(String(e)));
       }
     },
-    [db, gameId, playerId]
+    [db, finalGameId, finalPlayerId]
   );
 
   return { submitAction: submit, error };
@@ -140,33 +151,46 @@ export function useSubmitAction(gameId: string | null, playerId: string | null) 
 /**
  * Board only: subscribe to pending actions and apply them with your game config.
  * Call once in the board UI; keeps state in sync with Firestore.
+ * If args are omitted, tries to use NeonBoardContext and NeonGameProvider config.
  */
 export function useBoardActions(
-  gameId: string | null,
-  role: 'board' | 'player' | null,
-  currentState: GameStateSnapshot | null,
-  gameConfig: GameConfig
+  gameId?: string | null,
+  role?: 'board' | 'player' | null,
+  currentState?: GameStateSnapshot | null,
+  gameConfig?: GameConfig
 ) {
-  const { db } = useNeonBoardContext();
+  const { db, gameConfig: contextConfig } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalRole = role ?? boardCtx?.role ?? null;
+  const finalState = currentState ?? boardCtx?.snapshot ?? null;
+  const config = gameConfig ?? contextConfig;
+  
   const processing = useRef(false);
   const lastProcessed = useRef<string>('');
 
   useEffect(() => {
-    if (!gameId || role !== 'board' || !currentState) return;
+    if (!finalGameId || finalRole !== 'board' || !finalState) return;
 
-    const unsub = subscribeToPendingActions(db, gameId, async (actions) => {
+    const unsub = subscribeToPendingActions(db, finalGameId, async (actions) => {
       if (actions.length === 0 || processing.current) return;
+      if (!config) {
+        console.warn('Neon: Missing gameConfig in useBoardActions. Actions will not be processed.');
+        return;
+      }
+
       const key = actions.map((a) => a.id).join(',');
       if (key === lastProcessed.current) return;
 
       processing.current = true;
       try {
-        const ctx = currentState.context;
+        const ctx = finalState.context;
         await processPendingActions(
           db,
-          gameId,
+          finalGameId,
           {
-            state: currentState.state,
+            state: finalState.state,
             turn: ctx.turn,
             round: ctx.round,
             phase: ctx.phase,
@@ -176,7 +200,7 @@ export function useBoardActions(
             phases: ctx.phases,
           },
           actions,
-          gameConfig
+          config
         );
         lastProcessed.current = key;
       } finally {
@@ -185,43 +209,59 @@ export function useBoardActions(
     });
 
     return () => unsub();
-  }, [db, gameId, role, currentState?.state, currentState?.context, gameConfig]);
+  }, [db, finalGameId, finalRole, finalState?.state, finalState?.context, config]);
 }
 
 /**
  * Board only: advance to the next turn (next player, increment turn).
  * Pass gameConfig to run turns.onEnd / turns.onBegin hooks.
+ * If args are omitted, tries to use NeonBoardContext and NeonGameProvider config.
  */
 export function useEndTurn(
-  gameId: string | null,
-  role: 'board' | 'player' | null,
-  currentState: GameStateSnapshot | null,
+  gameId?: string | null,
+  role?: 'board' | 'player' | null,
+  currentState?: GameStateSnapshot | null,
   gameConfig?: GameConfig
 ) {
-  const { db } = useNeonBoardContext();
+  const { db, gameConfig: contextConfig } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalRole = role ?? boardCtx?.role ?? null;
+  const finalState = currentState ?? boardCtx?.snapshot ?? null;
+  const config = gameConfig ?? contextConfig;
+
   return useCallback(async () => {
-    if (!gameId || role !== 'board' || !currentState) return;
-    await endTurn(db, gameId, currentState, gameConfig);
-  }, [db, gameId, role, currentState, gameConfig]);
+    if (!finalGameId || finalRole !== 'board' || !finalState) return;
+    await endTurn(db, finalGameId, finalState, config);
+  }, [db, finalGameId, finalRole, finalState, config]);
 }
 
 /**
  * Board only: advance to the next phase. Pass gameConfig to run phase onEnd/onBegin hooks.
  * Call with optional nextPhase to jump to a specific phase, or omit to use the configured phases list.
+ * If args are omitted, tries to use NeonBoardContext and NeonGameProvider config.
  */
 export function useEndPhase(
-  gameId: string | null,
-  role: 'board' | 'player' | null,
-  currentState: GameStateSnapshot | null,
+  gameId?: string | null,
+  role?: 'board' | 'player' | null,
+  currentState?: GameStateSnapshot | null,
   gameConfig?: GameConfig
 ) {
-  const { db } = useNeonBoardContext();
+  const { db, gameConfig: contextConfig } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalRole = role ?? boardCtx?.role ?? null;
+  const finalState = currentState ?? boardCtx?.snapshot ?? null;
+  const config = gameConfig ?? contextConfig;
+
   return useCallback(
     async (nextPhase?: string) => {
-      if (!gameId || role !== 'board' || !currentState) return;
-      await endPhase(db, gameId, currentState, nextPhase, gameConfig);
+      if (!finalGameId || finalRole !== 'board' || !finalState) return;
+      await endPhase(db, finalGameId, finalState, nextPhase, config);
     },
-    [db, gameId, role, currentState, gameConfig]
+    [db, finalGameId, finalRole, finalState, config]
   );
 }
 
@@ -229,16 +269,21 @@ export function useEndPhase(
  * Board only: set phase to a specific value (custom phase flow).
  */
 export function useSetPhase(
-  gameId: string | null,
-  role: 'board' | 'player' | null
+  gameId?: string | null,
+  role?: 'board' | 'player' | null
 ) {
-  const { db } = useNeonBoardContext();
+  const { db } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalRole = role ?? boardCtx?.role ?? null;
+
   return useCallback(
     async (phase: string) => {
-      if (!gameId || role !== 'board') return;
-      await setPhase(db, gameId, phase);
+      if (!finalGameId || finalRole !== 'board') return;
+      await setPhase(db, finalGameId, phase);
     },
-    [db, gameId, role]
+    [db, finalGameId, finalRole]
   );
 }
 
@@ -246,16 +291,21 @@ export function useSetPhase(
  * Board only: set turn order to a list of player IDs (customize or reshuffle).
  */
 export function useSetTurnOrder(
-  gameId: string | null,
-  role: 'board' | 'player' | null
+  gameId?: string | null,
+  role?: 'board' | 'player' | null
 ) {
-  const { db } = useNeonBoardContext();
+  const { db } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalRole = role ?? boardCtx?.role ?? null;
+
   return useCallback(
     async (turnOrder: string[]) => {
-      if (!gameId || role !== 'board') return;
-      await setTurnOrder(db, gameId, turnOrder);
+      if (!finalGameId || finalRole !== 'board') return;
+      await setTurnOrder(db, finalGameId, turnOrder);
     },
-    [db, gameId, role]
+    [db, finalGameId, finalRole]
   );
 }
 
@@ -263,16 +313,21 @@ export function useSetTurnOrder(
  * Board only: set game status (e.g. 'ended' to end the game).
  */
 export function useSetStatus(
-  gameId: string | null,
-  role: 'board' | 'player' | null
+  gameId?: string | null,
+  role?: 'board' | 'player' | null
 ) {
-  const { db } = useNeonBoardContext();
+  const { db } = useNeonGameContext();
+  const boardCtx = useNeonBoardContext();
+
+  const finalGameId = gameId ?? boardCtx?.gameId ?? null;
+  const finalRole = role ?? boardCtx?.role ?? null;
+
   return useCallback(
     async (status: GameStatus) => {
-      if (!gameId || role !== 'board') return;
-      await setStatus(db, gameId, status);
+      if (!finalGameId || finalRole !== 'board') return;
+      await setStatus(db, finalGameId, status);
     },
-    [db, gameId, role]
+    [db, finalGameId, finalRole]
   );
 }
 
@@ -290,4 +345,35 @@ export function useStoredSession() {
 /** Leave current game and clear stored session. */
 export function useLeaveGame() {
   return useCallback(() => leaveGame(), []);
+}
+
+/**
+ * Composite hook for "Everything you need" in a game component.
+ * Must be used within NeonBoardProvider.
+ * Returns game state and all helper functions.
+ */
+export function useNeonBoard() {
+  const ctx = useNeonBoardContext();
+  if (!ctx) throw new Error("useNeonBoard must be used within NeonBoardProvider");
+
+  const { gameId, role, snapshot } = ctx;
+
+  const endTurn = useEndTurn();
+  const endPhase = useEndPhase();
+  const setPhase = useSetPhase();
+  const setTurnOrder = useSetTurnOrder();
+  const setStatus = useSetStatus();
+  const { submitAction } = useSubmitAction();
+
+  return {
+    gameId,
+    role,
+    snapshot,
+    endTurn,
+    endPhase,
+    setPhase,
+    setTurnOrder,
+    setStatus,
+    submitAction,
+  };
 }

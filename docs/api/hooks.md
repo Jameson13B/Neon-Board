@@ -5,11 +5,13 @@ next: { text: 'Imperative API', link: '/api/imperative' }
 
 # Hooks
 
-All hooks must be used inside **NeonBoardProvider**. The provider supplies `db` (Firestore), `getCurrentUserId`, and optionally `getBoardId` to the tree. Your game is defined by a **GameConfig**; you pass it to **useCreateGame**’s `createGame(options)` (as `options.gameConfig`) and to **useBoardActions**, and **useEndTurn** / **useEndPhase** so the board applies actions and runs lifecycle hooks. See [Game config](/guide/game-config).
+All hooks must be used inside **NeonGameProvider**. The provider supplies `db` (Firestore) and `gameConfig` to the tree.
+
+For the best experience, wrap your game component in **NeonBoardProvider** and use **useNeonBoard**.
 
 ---
 
-## NeonBoardProvider
+## NeonGameProvider
 
 **Props:**
 
@@ -18,13 +20,45 @@ All hooks must be used inside **NeonBoardProvider**. The provider supplies `db` 
 | **db** | `Firestore` | Your Firestore instance. |
 | **getCurrentUserId** | `() => string \| null` | Returns the current user id (e.g. from Firebase Auth). Use `() => null` for board-only apps. |
 | **getBoardId** | `() => string` (optional) | Returns the board device id. If not provided, create game will use `getCurrentUserId()`. Use **getOrCreateBoardId** for board-only (no auth). |
+| **gameConfig** | `GameConfig` (optional) | Global game configuration. If provided, all hooks will use this by default. |
 | **children** | `ReactNode` | Your app. |
 
 ---
 
-## useNeonBoardContext()
+## NeonBoardProvider
 
-Returns `{ db, getCurrentUserId, getBoardId }`. Throws if used outside **NeonBoardProvider**.
+Wraps a specific game instance. Automatically fetches state and, if `role="board"`, processes actions.
+
+**Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| **gameId** | `string` | The ID of the game to connect to. |
+| **role** | `'board' \| 'player'` | Default `'player'`. If `'board'`, it will run **useBoardActions** automatically. |
+| **children** | `ReactNode` | Your game UI. |
+
+---
+
+## useNeonBoard()
+
+Composite hook that returns everything you need for the active game. Must be used inside **NeonBoardProvider**.
+
+**Returns:**
+- **gameId**: `string`
+- **role**: `'board' \| 'player'`
+- **snapshot**: `GameStateSnapshot | null`
+- **endTurn()**: Function to end the turn (board only).
+- **endPhase(nextPhase?)**: Function to end the phase (board only).
+- **setPhase(phase)**: Function to set phase (board only).
+- **setTurnOrder(ids)**: Function to set turn order (board only).
+- **setStatus(status)**: Function to set status (board only).
+- **submitAction(type, payload?)**: Function to submit an action (players).
+
+---
+
+## useNeonGameContext()
+
+Returns `{ db, getCurrentUserId, getBoardId, gameConfig }`. Throws if used outside **NeonGameProvider**.
 
 ---
 
@@ -35,8 +69,8 @@ Create a new game; the caller becomes the board.
 **Returns:** `createGame`, `gameId`, `joinCode`, `error`, `loading`
 
 - **createGame(options?)** — `options`: **CreateGameOptions**
-  - `gameConfig?: GameConfig` — If set, phases and initial phase are derived (phase with **start: true**, then **next** chain). If **setup** is defined, it runs and its return value is the initial state.
-  - `joinCode?`, `initialState?`, `initialPhase?`, `phases?`, `turnOrder?`, `meta?` — See [Types](/api/types). **initialState** is ignored when **gameConfig.setup** is provided.
+  - `gameConfig?: GameConfig` — If set, phases and initial phase are derived. If not set, uses `gameConfig` from **NeonGameProvider**.
+  - `joinCode?`, `initialState?`, `initialPhase?`, `phases?`, `turnOrder?`, `meta?` — See [Types](/api/types).
   - Returns `Promise<CreateGameResult | null>`.
 
 ---
@@ -57,13 +91,11 @@ Subscribe to the live game document.
 
 **Returns:** **GameStateSnapshot | null** (null while loading or when `gameId` is null).
 
-Snapshot has **state** (your game data), **context** (turn, round, phase, status, turnOrder, currentPlayerId, etc.), **meta**, **boardId**, and **playerIds**. Use **snapshot.context** for “whose turn?”, “which phase?”, “is game ended?”.
-
 ---
 
-## useSubmitAction(gameId, playerId)
+## useSubmitAction(gameId?, playerId?)
 
-For players: enqueue an action for the board to apply.
+For players: enqueue an action for the board to apply. If args are omitted, infers them from **NeonBoardProvider** and **NeonGameProvider**.
 
 **Returns:** `submitAction`, `error`
 
@@ -71,39 +103,46 @@ For players: enqueue an action for the board to apply.
 
 ---
 
-## useBoardActions(gameId, role, snapshot, gameConfig)
+## useBoardActions(gameId?, role?, snapshot?, gameConfig?)
 
-**Board only.** Subscribes to pending actions and applies them with your **gameConfig**. The engine validates that each action type is allowed in the current phase (global moves + phase moves). Call once in the board UI. Memoize **gameConfig** (e.g. `useMemo`) so the effect doesn’t re-run every render.
+**Board only.** Subscribes to pending actions and applies them. Call once in the board UI (or use **NeonBoardProvider** which does this for you).
 
-**gameConfig:** **GameConfig** — **moves** (global), **phases** (each with **moves** object and optional **start**, **next**, **onBegin**, **onEnd**). Engine allows an action in phase P if it's in **config.moves** or **config.phases[P].moves** (action type → `(state, payload, context) => newState`). **context** is **ActionContext** (engine state + `playerId` who sent the action).
-
----
-
-## useEndTurn(gameId, role, snapshot, gameConfig?)
-
-**Board only.** Returns a function that advances to the next player and increments turn (and round when wrapping). Call it when the current player’s turn is over. Pass the full **snapshot** (state + context). If you pass **gameConfig**, **turns.onEnd** and **turns.onBegin** run.
+- If args are omitted, infers them from **NeonBoardProvider** and **NeonGameProvider**.
+- **gameConfig** is required (either passed or in provider) to validate moves and run reducers.
 
 ---
 
-## useEndPhase(gameId, role, snapshot, gameConfig?)
+## useEndTurn(gameId?, role?, snapshot?, gameConfig?)
 
-**Board only.** Returns a function that advances to the next phase. Call with no args to use the phase list (from config's **next** chain), or **endPhase(nextPhase)** to jump. Pass the full **snapshot**. If you pass **gameConfig**, the current phase's **onEnd** and the next phase's **onBegin** run.
+**Board only.** Returns a function that advances to the next player and increments turn.
+
+- If args are omitted, infers them from **NeonBoardProvider** and **NeonGameProvider**.
+- **gameConfig** is used to run **turns.onEnd** / **turns.onBegin**.
 
 ---
 
-## useSetPhase(gameId, role)
+## useEndPhase(gameId?, role?, snapshot?, gameConfig?)
+
+**Board only.** Returns a function that advances to the next phase.
+
+- If args are omitted, infers them from **NeonBoardProvider** and **NeonGameProvider**.
+- **gameConfig** is used to run phase **onEnd** / **onBegin**.
+
+---
+
+## useSetPhase(gameId?, role?)
 
 **Board only.** Returns **setPhase(phase: string)** to set the current phase to any value.
 
 ---
 
-## useSetTurnOrder(gameId, role)
+## useSetTurnOrder(gameId?, role?)
 
 **Board only.** Returns **setTurnOrder(turnOrder: string[])** to set or reshuffle the turn order (player IDs).
 
 ---
 
-## useSetStatus(gameId, role)
+## useSetStatus(gameId?, role?)
 
 **Board only.** Returns **setStatus(status: GameStatus)** to set game status (e.g. `'ended'`).
 

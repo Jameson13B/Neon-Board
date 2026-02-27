@@ -3,8 +3,11 @@
  * Board + clients or clients-only; hooks-first API.
  */
 
-export { NeonBoardProvider, useNeonBoardContext } from './context.js';
-export type { NeonBoardContextValue, NeonBoardProviderProps } from './context.js';
+export { NeonGameProvider, useNeonGameContext, NeonBoardContext, useNeonBoardContext } from './context.js';
+export type { NeonGameProviderProps, NeonGameContextValue, NeonBoardContextValue } from './context.js';
+
+export { NeonBoardProvider } from './BoardProvider.js';
+export type { NeonBoardProviderProps } from './BoardProvider.js';
 
 export {
   useCreateGame,
@@ -19,6 +22,7 @@ export {
   useSetStatus,
   useStoredSession,
   useLeaveGame,
+  useNeonBoard,
 } from './hooks.js';
 
 export {

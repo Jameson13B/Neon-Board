@@ -21,25 +21,35 @@ Peer deps: `firebase` (v11+), `react` (v17+) if you use hooks.
 
 ## 2. Provider
 
-Wrap your app with **NeonBoardProvider**. You need **db** (Firestore) and either **getCurrentUserId** (players) or **getBoardId** (board), or both.
+Wrap your app with **NeonGameProvider**. You need **db** (Firestore) and either **getCurrentUserId** (players) or **getBoardId** (board). You can also pass your **gameConfig** here so it's available everywhere.
 
 **Board-only (no auth):**
 
 ```jsx
 import { getFirestore } from 'firebase/firestore';
-import { NeonBoardProvider, getOrCreateBoardId } from 'neon-board';
+import { NeonGameProvider, getOrCreateBoardId } from 'neon-flow';
+import { gameConfig } from './gameConfig';
 
-<NeonBoardProvider db={db} getCurrentUserId={() => null} getBoardId={getOrCreateBoardId}>
+<NeonGameProvider 
+  db={db} 
+  getCurrentUserId={() => null} 
+  getBoardId={getOrCreateBoardId}
+  gameConfig={gameConfig}
+>
   <App />
-</NeonBoardProvider>
+</NeonGameProvider>
 ```
 
 **With auth (players):**
 
 ```jsx
-<NeonBoardProvider db={db} getCurrentUserId={() => getAuth().currentUser?.uid ?? null}>
+<NeonGameProvider 
+  db={db} 
+  getCurrentUserId={() => getAuth().currentUser?.uid ?? null}
+  gameConfig={gameConfig}
+>
   <App />
-</NeonBoardProvider>
+</NeonGameProvider>
 ```
 
 ---
@@ -113,17 +123,26 @@ submitAction('increment', { amount: 1 });
 
 ## 8. Board: apply actions and advance
 
-Pass the **same gameConfig** to **useBoardActions**, **useEndTurn**, and **useEndPhase** so the engine validates moves and runs lifecycle hooks.
+Wrap your board component in **NeonBoardProvider** to automatically handle state and actions. Then use **useNeonBoard** to get everything you need.
 
 ```jsx
-const gameConfig = useGameConfig();
-const snapshot = useGameState(gameId);
+import { NeonBoardProvider, useNeonBoard } from 'neon-flow';
 
-useBoardActions(gameId, role, snapshot, gameConfig);
+function GameScreen({ gameId }) {
+  // role="board" means this device applies actions
+  return (
+    <NeonBoardProvider gameId={gameId} role="board">
+      <GameBoard />
+    </NeonBoardProvider>
+  );
+}
 
-const endTurn  = useEndTurn(gameId, role, snapshot, gameConfig);
-const endPhase = useEndPhase(gameId, role, snapshot, gameConfig);
-// Call endTurn() or endPhase() when the board decides (e.g. button click)
+function GameBoard() {
+  const { snapshot, endTurn, endPhase } = useNeonBoard();
+  
+  // endTurn() and endPhase() automatically use the config from provider
+  return <button onClick={() => endTurn()}>End Turn</button>;
+}
 ```
 
 ---

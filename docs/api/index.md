@@ -5,7 +5,7 @@ next: { text: 'Hooks', link: '/api/hooks' }
 
 # API Reference
 
-Your game is defined by a **game config** (**GameConfig**): **setup**, **moves** (global), **turns** (onBegin/onEnd), and **phases** (each with **start**, **next**, **onBegin**, **onEnd**, **moves**). Pass the same config to **createGame**, **useBoardActions**, and **useEndTurn** / **useEndPhase**. Full shape: [Game config](/guide/game-config) and [Types](/api/types).
+Your game is defined by a **game config** (**GameConfig**): **setup**, **moves** (global), **turns** (onBegin/onEnd), and **phases** (each with **start**, **next**, **onBegin**, **onEnd**, **moves**). Pass this config to **NeonGameProvider** so it's available everywhere. Full shape: [Game config](/guide/game-config) and [Types](/api/types).
 
 ---
 
@@ -19,9 +19,9 @@ Your game is defined by a **game config** (**GameConfig**): **setup**, **moves**
 | **useJoinGame()** | joinGame(code). |
 | **useGameState(gameId)** | Live snapshot (state, context, meta). |
 | **useSubmitAction(gameId, playerId)** | submitAction(type, payload). |
-| **useBoardActions(gameId, role, snapshot, gameConfig)** | Board only. Applies pending actions with gameConfig. |
-| **useEndTurn(gameId, role, snapshot, gameConfig?)** | Board only. Advance turn. Pass gameConfig to run turns.onEnd/onBegin. |
-| **useEndPhase(gameId, role, snapshot, gameConfig?)** | Board only. Advance phase. Pass gameConfig to run phase onEnd/onBegin. |
+| **useBoardActions(gameId?, role?, snapshot?, gameConfig?)** | Board only. Applies pending actions. Infers args from context. |
+| **useEndTurn(gameId?, role?, snapshot?, gameConfig?)** | Board only. Advance turn. Infers args from context. |
+| **useEndPhase(gameId?, role?, snapshot?, gameConfig?)** | Board only. Advance phase. Infers args from context. |
 | **useSetPhase**, **useSetTurnOrder**, **useSetStatus** | Board only. |
 | **useStoredSession()**, **useLeaveGame()** | Reconnection. |
 

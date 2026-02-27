@@ -5,7 +5,7 @@ next: { text: 'Quick start', link: '/guide/getting-started' }
 
 # Game config
 
-**Your game is one object.** The game config defines phases, which moves are allowed where, lifecycle hooks, and how phases flow. You pass the same config to **createGame**, **useBoardActions**, and **endTurn** / **endPhase** so the board applies actions and runs hooks with one source of truth.
+**Your game is one object.** The game config defines phases, which moves are allowed where, lifecycle hooks, and how phases flow. You pass this config to **NeonGameProvider** so the framework can use it everywhere.
 
 ---
 
@@ -99,28 +99,36 @@ All hooks receive **state**, **payload** (empty `{}` for phase/turn transitions)
 
 ## Using the config
 
-**Create game** — Pass **gameConfig** to **createGame**. Phases and initial phase come from the config; if **setup** is defined, it runs and its return value is the initial state.
-
-```ts
-await createGame(db, boardId, { gameConfig });
-```
-
-**Board applies actions** — Pass the same **gameConfig** to **useBoardActions** (or **processPendingActions**). The engine validates the action against the current phase and runs the matching reducer.
+**1. Pass to Provider** — Provide it at the root so all hooks can access it.
 
 ```tsx
-useBoardActions(gameId, role, snapshot, gameConfig);
+<NeonGameProvider gameConfig={gameConfig} ...>
 ```
 
-**End turn / end phase** — Pass **gameConfig** (and full snapshot with **state**) so **turns.onEnd/onBegin** and **phase onEnd/onBegin** run.
-
-```tsx
-const endTurn   = useEndTurn(gameId, role, snapshot, gameConfig);
-const endPhase  = useEndPhase(gameId, role, snapshot, gameConfig);
-```
-
-**UI** — Use **getAllowedMoveTypes(config, context.phase)** to know which actions are valid in the current phase (e.g. to enable/disable buttons).
+**2. Create game** — **useCreateGame** will automatically use the provider's config to set up phases and initial state.
 
 ```ts
+const { createGame } = useCreateGame();
+await createGame(); // Uses provider config
+```
+
+**3. Board logic** — Wrap your board in **NeonBoardProvider** and use **useNeonBoard**. The framework will automatically use the config to validate moves and run hooks.
+
+```tsx
+<NeonBoardProvider gameId={gameId} role="board">
+  <GameBoard />
+</NeonBoardProvider>
+
+function GameBoard() {
+  const { endTurn } = useNeonBoard();
+  // endTurn() uses the config from the provider
+}
+```
+
+**4. UI** — Use **getAllowedMoveTypes(config, context.phase)** to know which actions are valid in the current phase (e.g. to enable/disable buttons).
+
+```ts
+const { gameConfig } = useNeonGameContext();
 const allowed = getAllowedMoveTypes(gameConfig, snapshot.context.phase);
 if (allowed.has('placeBet')) { /* show Place bet button */ }
 ```
